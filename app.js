@@ -112,11 +112,6 @@ function filterGuide() {
 }
 function openGuideAnchor() {
   const article=document.getElementById(location.hash.slice(1));
-  if (article?.matches('.guide-brief')) {
-    article.open = true;
-    article.scrollIntoView({block:'start'});
-    return;
-  }
   if (!article?.matches('.guide-item')) return;
   selectedGroup='all';
   guideQuery.value='';
