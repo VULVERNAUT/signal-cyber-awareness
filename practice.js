@@ -25,14 +25,16 @@
   }
   function exit(){
     panel.hidden=true;picker.hidden=false;
-    picker.querySelector('[data-route="'+route+'"]')?.focus();
-    if(location.hash.startsWith('#practice-')) history.replaceState(null,'',location.pathname+location.search);
+    const group=topics.find(topic=>'topic-'+topic.id===route)?.group||route;
+    picker.querySelector('[data-route="'+group+'"]')?.focus();
+    if(location.hash.startsWith('#practice-')) history.replaceState(null,'',location.href.split('#')[0]);
   }
   function render(){
     answered=false;
     panel.replaceChildren();
     const bar=el('div',null,'round-head');
-    bar.append(el('strong',names[route],'kicker'),button('К выбору темы','chip',exit));
+    const routeTitle=names[route]||topics.find(topic=>'topic-'+topic.id===route)?.title;
+    bar.append(el('strong',routeTitle,'kicker'),button('К выбору темы','chip',exit));
     panel.append(bar);
     if(position===run.length){
       const h=el('h2','Верных решений — '+score+' из '+run.length);h.tabIndex=-1;
@@ -75,6 +77,11 @@
     h.focus();
   }
   function openRoute(id){
+    if(id.startsWith('topic-')){
+      const matches=scenarios.filter(item=>item[5]===id.slice(6));
+      if(matches.length) start(id,shuffled(matches));
+      return;
+    }
     if(!Object.hasOwn(names,id))return;
     start(id,id==='quick'?quickRound():shuffled(buckets[id]));
   }
