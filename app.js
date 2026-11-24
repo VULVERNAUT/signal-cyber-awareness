@@ -160,6 +160,31 @@ if(form) {
   };
   let busy=false;
   let endpointActive=false;
+  let challengeRequired=false;
+  let challengeToken='';
+  let widgetId;
+  function enableVerification(siteKey) {
+    challengeRequired=true;
+    const modeLabel=$('#mode');
+    const localLabel='Справочник · проверка для ИИ-подбора';
+    const holder=el('div',null,'chat-verification');
+    form.before(holder);
+    modeLabel.textContent=localLabel;
+    const script=document.createElement('script');
+    script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async=true;
+    script.onload=()=>{
+      if(!window.turnstile) return;
+      widgetId=window.turnstile.render(holder,{
+        sitekey:siteKey,action:'signal_assistant',language:'ru',theme:'dark',size:'flexible',appearance:'interaction-only',
+        callback:token=>{challengeToken=token;modeLabel.textContent='Подбор с ИИ · ответы из справочника';},
+        'expired-callback':()=>{challengeToken='';modeLabel.textContent=localLabel;},
+        'error-callback':()=>{challengeToken='';modeLabel.textContent='Режим справочника';return true;}
+      });
+    };
+    script.onerror=()=>{modeLabel.textContent='Режим справочника';};
+    document.head.append(script);
+  }
   function message(text,who) {
     const result=el('div',text,'bubble '+who);
     messages.append(result);
@@ -183,14 +208,22 @@ if(form) {
     bubble.append(list,refs);
   }
   async function choose(question,ids) {
-    if(!endpointActive) return ids[0];
+    if(!endpointActive||ids.length<2||(challengeRequired&&!challengeToken)) return ids[0];
+    const payload=challengeRequired?{question,verification:challengeToken}:{question};
+    if(challengeRequired) challengeToken='';
     try {
-      const ret=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question}),signal:AbortSignal.timeout(3600)});
+      const ret=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(challengeRequired?5500:3600)});
       if(!ret.ok) return ids[0];
       const data=await ret.json();
       if(data.mode!=='provider') return ids[0];
       return ids.includes(data.id)?data.id:ids[0];
     } catch { return ids[0]; }
+    finally {
+      if(challengeRequired&&widgetId!==undefined) {
+        $('#mode').textContent='Справочник · проверка для ИИ-подбора';
+        window.turnstile.reset(widgetId);
+      }
+    }
   }
   async function send(input, focusInput=true) {
     if(busy||!input.trim()) return;
@@ -218,7 +251,8 @@ if(form) {
     .then(ret=>ret.ok&&ret.headers.get('content-type')?.includes('application/json')?ret.json():{})
     .then(status=>{
       endpointActive=status.provider===true;
-      if(endpointActive) $('#mode').textContent='Подбор с ИИ · ответы из справочника';
+      if(endpointActive&&status.siteKey) enableVerification(status.siteKey);
+      else if(endpointActive) $('#mode').textContent='Подбор с ИИ · ответы из справочника';
     }).catch(()=>{});
   },{once:true});
 }

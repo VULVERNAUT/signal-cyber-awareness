@@ -1604,7 +1604,8 @@
   function decide(input) {
     const q = input.trim().toLowerCase().replaceAll('ё','е');
     if (!q || q.length > 280) return {state:'length'};
-    if (sensitive.test(q)) return {state:'private'};
+    const credentialLike=/(?:\b(?:sk-(?:proj-)?|gh[pousr]_|github_pat_)[a-z0-9_-]{12,}|\bbearer\s+[a-z0-9._~+\/-]{10,}|\beyj[a-z0-9_-]{6,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}|(?:cvv|cvc)\s*[:=\s]\s*\d{3,4}\b)/i;
+    if (sensitive.test(q)||credentialLike.test(q)) return {state:'private'};
     if (prohibited.test(q) && !recovery.test(q)) return {state:'denied'};
     if (recovery.test(q) && !/обойти|украсть|эксплойт|bypass|\bsteal(?:s|ing)?\b/iu.test(q)) return {state:'match',ids:['incident']};
     const hasKey = key => key.toLowerCase() === 'rat' ? /(?:^|[^a-z])rat(?:$|[^a-z])/i.test(q) : q.includes(key.toLowerCase().replaceAll('ё','е'));
