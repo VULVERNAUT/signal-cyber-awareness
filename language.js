@@ -1,6 +1,14 @@
 'use strict';
 (() => {
   const current=document.documentElement.lang;
+  // file: pages have opaque origins. Document transitions require a shared HTTP origin.
+  if((location.protocol==='https:' || location.protocol==='http:') && 'CSSViewTransitionRule' in window){
+    const sheet=document.createElement('link');
+    sheet.rel='stylesheet';
+    sheet.media='(prefers-reduced-motion: no-preference)';
+    sheet.href=(current==='kk'?'../':'')+'assets/navigation.css';
+    document.head.append(sheet);
+  }
   const options=Array.from(document.querySelectorAll('.locale-option'));
   function sync(){
     for(const option of options){
