@@ -1,2 +1,8 @@
-@view-transition { navigation: auto; }
-
+/* One short reveal on same-site page changes; reading and focus stay native. */
+@media (prefers-reduced-motion: no-preference) {
+  .page-arrived main { animation: section-arrives 280ms cubic-bezier(.22, 1, .36, 1) both; }
+  @keyframes section-arrives {
+    from { opacity: .76; transform: translateY(9px); }
+    to { opacity: 1; transform: none; }
+  }
+}

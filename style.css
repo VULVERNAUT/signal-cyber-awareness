@@ -402,17 +402,6 @@ body[data-page=lab] .practice-quick .primary:is(:hover,:focus-visible){backgroun
 .practice-paths .practice-route{position:relative;padding-right:2.5em}
 .practice-paths .practice-route::after{content:"↗";position:absolute;right:12px;top:10px;font-size:1.3em;color:#a99bcd}
 body:has(.practice-quick button:is(:hover,:focus-visible)) .switch-cap{transform:translateY(5%)}
-@supports(view-transition-name: root){
-  @media(prefers-reduced-motion:no-preference){
-    .top{view-transition-name:site-header}
-    ::view-transition-old(root){animation:signal-leave .17s ease-out both}
-    ::view-transition-new(root){animation:signal-enter .29s cubic-bezier(.22,1,.36,1) both}
-    ::view-transition-group(site-header){animation-duration:.16s}
-  }
-  @media(prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
-}
-@keyframes signal-leave{to{opacity:0;transform:translateY(-5px)}}
-@keyframes signal-enter{from{opacity:0;transform:translateY(9px)}}
 @keyframes word-arrive{from{transform:translateY(108%) rotate(2deg)}}
 @keyframes instrument-arrive{from{opacity:0;transform:translate(9px,6px) scale(.96)}}
 @media(prefers-reduced-motion:no-preference){

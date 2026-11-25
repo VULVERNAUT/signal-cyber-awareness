@@ -1,13 +1,13 @@
 'use strict';
 (() => {
   const current=document.documentElement.lang;
-  // file: pages have opaque origins. Document transitions require a shared HTTP origin.
-  if((location.protocol==='https:' || location.protocol==='http:') && 'CSSViewTransitionRule' in window){
-    const sheet=document.createElement('link');
-    sheet.rel='stylesheet';
-    sheet.media='(prefers-reduced-motion: no-preference)';
-    sheet.href=(current==='kk'?'../':'')+'assets/navigation.css';
-    document.head.append(sheet);
+  // Keep the browser's normal navigation, focus, anchor jumps and back/forward restoration.
+  const entry=performance.getEntriesByType('navigation')[0];
+  if(entry?.type==='navigate' && !location.hash && /^https?:$/.test(location.protocol) && document.referrer){
+    try{
+      if(new URL(document.referrer).origin===location.origin)
+        document.documentElement.classList.add('page-arrived');
+    }catch{}
   }
   const options=Array.from(document.querySelectorAll('.locale-option'));
   function sync(){
