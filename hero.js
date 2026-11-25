@@ -21,9 +21,11 @@
     frame = 0;
     if (reduced.matches || !inView || document.hidden) return;
     const progress = Math.max(0, Math.min(1, window.scrollY / end));
+    const seat = ramp(progress / .73);
+    receiver.classList.toggle('is-floating', seat < 1);
     if (progress !== lastProgress) {
       sequence.style.setProperty('--progress', progress.toFixed(4));
-      sequence.style.setProperty('--seat', ramp(progress / .73).toFixed(4));
+      sequence.style.setProperty('--seat', seat.toFixed(4));
       sequence.style.setProperty('--transmit', ramp((progress - .43) / .54).toFixed(4));
       lastProgress = progress;
     }
@@ -31,7 +33,11 @@
     receiver.style.setProperty('--tilt-y', (tiltY * (1 - progress)).toFixed(2) + 'deg');
   }
   function queue() {
-    if (!frame && inView && !document.hidden && !reduced.matches) frame = requestAnimationFrame(render);
+    if (!inView || document.hidden || reduced.matches) {
+      receiver.classList.remove('is-floating');
+      return;
+    }
+    if (!frame) frame = requestAnimationFrame(render);
   }
   function measure() {
     end = Math.max(170, Math.min(480, opening.offsetHeight * .66));
@@ -64,7 +70,7 @@
   reduced.addEventListener('change', preference);
   if ('ResizeObserver' in window) new ResizeObserver(measure).observe(opening);
   if ('IntersectionObserver' in window) {
-    new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; if (inView) queue(); },
+    new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; queue(); },
       {rootMargin:'80px 0px'}).observe(sequence);
   }
   preference();

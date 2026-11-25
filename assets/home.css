@@ -65,7 +65,16 @@
 
 }
 @media(prefers-reduced-motion:no-preference) {
-  .is-driven .receiver-shield {transform:translateY(calc(var(--seat) * 23.4%));}
+  .is-driven .receiver-shield {
+    --hover-lift: clamp(5px, .65vw, 9px);
+    transform: translateY(calc(var(--seat) * 23.4%));
+    animation: shield-hover 4.8s ease-in-out infinite paused;
+  }
+  .is-driven .receiver.is-floating .receiver-shield {animation-play-state:running;}
+  @keyframes shield-hover {
+    0%, 100% {translate:0 0;}
+    50% {translate:0 calc(var(--hover-lift) * (var(--seat) - 1));}
+  }
   .is-driven .receiver-core {transform:translateY(calc(var(--seat) * 10.9%));}
   .is-driven .receiver-field::before {translate:calc(var(--progress) * -32px) 0;}
   .is-driven .receiver-field::after {translate:calc(var(--progress) * 38px) 0;}
