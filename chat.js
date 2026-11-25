@@ -19,6 +19,8 @@
     });
   }
   let active=false, gemini=false, busy=false, challenge='', widget=null, verification=false, continuation='';
+  let lastRoutes=[];
+  const navigation=window.signalNav;
   const response={
     private:say('Уберите из вопроса личные данные, пароли и коды подтверждения.','Сұрағыңыздан дербес деректерді, құпиясөздер мен растау кодтарын алып тастаңыз.'),
     denied:say('Я могу объяснить принцип угрозы и помочь с защитой, обнаружением или восстановлением доступа.','Қатердің қалай жұмыс істейтінін түсіндіріп, одан қорғануға, оны анықтауға немесе аккаунтты қалпына келтіруге көмектесемін.'),
@@ -31,7 +33,7 @@
   function greeting(){
     return gemini?say('Что хотите узнать об информационной безопасности? Можем разобрать конкретный случай или обсудить, как устроена технология.','Ақпараттық қауіпсіздік туралы не білгіңіз келеді? Нақты жағдайды талдай аламыз немесе технологияның қалай жұмыс істейтінін талқылаймыз.'):say('Здравствуйте! Опишите ситуацию или выберите готовый вопрос. Я подберу шаги из справочника.','Сәлеметсіз бе! Жағдайды сипаттаңыз немесе дайын сұрақты таңдаңыз. Анықтамалықтан тиісті нұсқауды табамын.');
   }
-  function reset(){continuation='';messages.replaceChildren();bubble(greeting());}
+  function reset(){continuation='';lastRoutes=[];messages.replaceChildren();bubble(greeting());}
   function label(){
     mode.textContent=verification&&!challenge?say('Для ИИ нужна проверка','ЖИ үшін тексеруден өтіңіз'):gemini?say('Gemini · ИИ-ассистент','Gemini · ЖИ көмекші'):active?say('Подбор темы с ИИ','Тақырыпты ЖИ таңдайды'):say('Режим справочника','Анықтамалық режимі');
   }
@@ -60,18 +62,30 @@
     if(plan)refs.append(link(say('Что делать сейчас','Қазір не істеу керек?'),'response.html#'+plan.id));
     container.append(list,refs);
   }
-  function renderAnswer(data,related){
+  function destinations(container,ids){
+    const routes=ids.filter(id=>Object.hasOwn(navigation.entries,id)).slice(0,2);
+    if(routes.length){
+      const refs=el('p',null,'sources');
+      for(const id of routes){
+        const item=navigation.entries[id],a=link(item.label,item.href);
+        a.addEventListener('click',()=>dialog.close());refs.append(a);
+      }
+      container.append(refs);
+    }
+    lastRoutes=routes;
+  }
+  function renderAnswer(data){
     const container=bubble(null);
     container.append(el('strong',say('Ответ Gemini','Gemini жауабы')));
     const body=el('p',data.answer.replace(/\*\*([^*]+)\*\*/g,'$1'),'generated-answer');
     container.append(body);
-    if(related){
-      const item=topics.find(t=>t.id===related);
-      if(item){
-        const refs=el('p',null,'sources');
-        refs.append(link(say('В справочнике · ','Анықтамалықта · ')+item.title,'guide.html#'+related));
-        container.append(refs);
+    destinations(container,data.routes||[]);
+    if(data.references?.length){
+      const refs=el('p',null,'sources');
+      for(const source of data.references){
+        if(typeof source.url==='string'&&source.url.startsWith('https://learn.microsoft.com/'))refs.append(link(source.title,source.url));
       }
+      container.append(refs);
     }
   }
   const isStatic=location.protocol==='file:'||/\.(github\.io|chatgpt\.site)$/.test(location.hostname);
@@ -85,7 +99,7 @@
       if(status.siteKey&&active)verify(status.siteKey);
       if(gemini){
         const note=$('.chat-note');
-        note.prepend(document.createTextNode(say('Вопрос и контекст диалога передаются Google. ','Сұрағыңыз бен диалогтың мәнмәтіні Google қызметіне жіберіледі. ')));
+        note.prepend(document.createTextNode(say('Диалог передаётся Google. По просьбе «найди в интернете» тема запроса также передаётся в Microsoft Learn. ','Диалог Google қызметіне жіберіледі. «Интернеттен ізде» десеңіз, сұрау тақырыбы Microsoft Learn қызметіне де жіберіледі. ')));
         const about=$('.chat-side p');
         if(about)about.textContent=say('Gemini формулирует ответ на ваш вопрос и учитывает уточнения в этом диалоге. Подходящие материалы справочника можно открыть отдельно.','Gemini сұрағыңызға жауап құрастырады және осы әңгімедегі нақтылауларыңызды ескереді. Байланысты материалдарды анықтамалықтан бөлек аша аласыз.');
         const quick=$$('.quick button');
@@ -114,22 +128,30 @@
       const id=result.ids?.[0];
       if(active&&(gemini||(result.ids?.length||0)>1)&&(!verification||challenge)){
         pending=bubble(say('Готовлю ответ…','Жауап дайындап жатырмын…'));messages.scrollTop=messages.scrollHeight;
-        const body={question,lang,conversation:continuation};
+        const body={question,lang,conversation:continuation,page:document.body.dataset.page};
         if(verification){body.verification=challenge;challenge='';}
         attempted=true;
         let data=null;
         try{
-          const r=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(gemini?29000:6500)});
+          const r=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(gemini?34000:6500)});
           if(r.ok)data=await r.json();
         }catch{}
         pending.remove();pending=null;
         if(data?.mode==='gemini'&&typeof data.answer==='string'){
-          continuation=data.conversation;renderAnswer(data,id);return;
+          continuation=data.conversation;renderAnswer(data);return;
         }
         if(data?.mode==='provider'&&data.id){renderCard(data.id);return;}
         if(gemini)bubble(say('Gemini сейчас недоступен. Можно повторить вопрос чуть позже.','Gemini қазір қолжетімсіз. Сұрағыңызды сәл кейін қайталап көріңіз.'));
       }
-      if(id)renderCard(id);else if(!attempted||!gemini)bubble(response.unknown);
+      const routes=navigation.suggested(question,lastRoutes);
+      if(routes.length){
+        const item=navigation.entries[routes[0]];
+        const result=bubble(item.detail||say('Откройте раздел «','«')+item.label+say('».','» бөлімін ашыңыз.'));
+        destinations(result,routes);
+      }else{
+        lastRoutes=[];
+        if(id)renderCard(id);else if(!attempted||!gemini)bubble(response.unknown);
+      }
     }finally{
       pending?.remove();
       if(attempted&&verification&&widget!==null){window.turnstile.reset(widget);label();}

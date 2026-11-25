@@ -10,7 +10,8 @@
     const q = input.normalize('NFKC').trim().toLowerCase().replaceAll('ё','е');
     if (!q || q.length > 1200) return {state:'length'};
     const credentialLike=/(?:\b(?:sk-(?:proj-)?|gh[pousr]_|github_pat_|aq\.|aiza)[a-z0-9_-]{12,}|\bbearer\s+[a-z0-9._~+\/-]{10,}|\beyj[a-z0-9_-]{6,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}|(?:cvv|cvc)\s*[:=\s]\s*\d{3,4}\b)/i;
-    const privacyText=q.replace(/\b(?:iso(?:\/iec)?|iec|nist\s+sp|rfc|cve)[ -]+\d{3,5}(?:[-:]\d{2,7})?\b/giu,'standard');
+    const privacyText=q.replace(/\b(?:iso(?:\/iec)?|iec|nist\s+sp|rfc|cve)[ -]+\d{3,5}(?:[-:]\d{2,7})?\b/giu,'standard')
+      .replace(/(?:\b(?:20(?:20|21|22|23|24|25))\s*[-–—]\s*20(?:20|21|22|23|24|25)\b|(?:^|\s)(?:в|за|с|по|на|от)\s+20(?:20|21|22|23|24|25)\b|\b20(?:20|21|22|23|24|25)\s*(?:год|жыл))/giu,' period ');
     if (sensitive.test(privacyText)||credentialLike.test(q)) return {state:'private'};
     if (harmfulKk.test(q)) return {state:'denied'};
     if (recoveryKk.test(q)) return {state:'match',ids:['incident']};
