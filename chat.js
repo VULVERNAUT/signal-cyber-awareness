@@ -20,6 +20,7 @@
   }
   let active=false, gemini=false, busy=false, challenge='', widget=null, verification=false, continuation='';
   let lastRoutes=[];
+  let retryButton=null;
   const navigation=window.signalNav;
   const response={
     private:say('Уберите из вопроса личные данные, пароли и коды подтверждения.','Сұрағыңыздан дербес деректерді, құпиясөздер мен растау кодтарын алып тастаңыз.'),
@@ -33,7 +34,7 @@
   function greeting(){
     return gemini?say('Что хотите узнать об информационной безопасности? Можем разобрать конкретный случай или обсудить, как устроена технология.','Ақпараттық қауіпсіздік туралы не білгіңіз келеді? Нақты жағдайды талдай аламыз немесе технологияның қалай жұмыс істейтінін талқылаймыз.'):say('Здравствуйте! Опишите ситуацию или выберите готовый вопрос. Я подберу шаги из справочника.','Сәлеметсіз бе! Жағдайды сипаттаңыз немесе дайын сұрақты таңдаңыз. Анықтамалықтан тиісті нұсқауды табамын.');
   }
-  function reset(){continuation='';lastRoutes=[];messages.replaceChildren();bubble(greeting());}
+  function reset(){continuation='';lastRoutes=[];retryButton=null;messages.replaceChildren();bubble(greeting());}
   function label(){
     mode.textContent=verification&&!challenge?say('Для ИИ нужна проверка','ЖИ үшін тексеруден өтіңіз'):gemini?say('Gemini · ИИ-ассистент','Gemini · ЖИ көмекші'):active?say('Подбор темы с ИИ','Тақырыпты ЖИ таңдайды'):say('Режим справочника','Анықтамалық режимі');
   }
@@ -119,21 +120,47 @@
   }
   reset();
   const ready=detect();
-  async function send(question,focus=true){
+  function offerRetry(question,reason){
+    if(reason==='expired'){
+      continuation='';lastRoutes=[];
+      bubble(say('Срок хранения контекста истёк или сервер перезапустился. Отправьте предыдущий вопрос и свой ответ одним сообщением, чтобы продолжить разбор.','Әңгімені сақтау мерзімі аяқталды немесе сервер қайта іске қосылды. Талдауды жалғастыру үшін алдыңғы сұрақ пен жауабыңызды бір хабарламаға жазыңыз.'));
+      return;
+    }
+    let notice=say('Не удалось получить ответ Gemini.','Gemini-ден жауап алу мүмкін болмады.');
+    if(reason==='quota')notice=say('Gemini сообщил о лимите запросов.','Gemini сұраулар шегіне жеткенін хабарлады.');
+    if(reason==='limit')notice=say('Достигнут лимит запросов демонстрации.','Демонстрациядағы сұраулар шегіне жеттіңіз.');
+    if(reason==='verification')notice=say('Для ответа Gemini пройдите проверку в окне чата.','Gemini жауап беруі үшін чаттағы тексеруден өтіңіз.');
+    const container=bubble(continuation?notice+say(' Можно повторить эту реплику в том же диалоге.',' Осы хабарламаны сол әңгімеде қайта жіберуге болады.'):notice);
+    const action=el('button',say('Повторить отправку','Қайта жіберу'),'chip');
+    action.type='button';
+    action.addEventListener('click',()=>{void send(question,false,container);});
+    retryButton=action;
+    const controls=el('p',null,'sources');controls.append(action);container.append(controls);
+    if(!continuation){
+      const routes=navigation.suggested(question);
+      if(routes.length)destinations(container,routes,question);
+    }
+  }
+  async function send(question,focus=true,retryNotice=null){
     question=question.trim();
     if(busy||!question)return;
     busy=true;
+    retryButton?.remove();retryButton=null;
+    retryNotice?.remove();
     const buttons=[...$$('.quick button'),$('.send'),$('#reset-chat')];
     buttons.forEach(b=>{b.disabled=true;});
     const result=decide(question);
     if(messages.childElementCount>=31)messages.replaceChildren(...[...messages.children].slice(-27));
-    field.value='';
-    bubble(result.state==='private'?say('Вопрос скрыт из-за возможных личных данных.','Сұрақта жеке деректер болуы мүмкін, сондықтан ол жасырылды.'):question,'user');
+    if(!retryNotice){
+      field.value='';
+      bubble(result.state==='private'?say('Вопрос скрыт из-за возможных личных данных.','Сұрақта жеке деректер болуы мүмкін, сондықтан ол жасырылды.'):question,'user');
+    }
     let pending=null, attempted=false;
     try{
       if(!['match','unknown'].includes(result.state)){bubble(response[result.state]);return;}
       await ready;
       const id=result.ids?.[0];
+      if(gemini&&verification&&!challenge){offerRetry(question,'verification');return;}
       if(active&&(gemini||(result.ids?.length||0)>1)&&(!verification||challenge)){
         pending=bubble(say('Готовлю ответ…','Жауап дайындап жатырмын…'));messages.scrollTop=messages.scrollHeight;
         const body={question,lang,conversation:continuation,page:document.body.dataset.page};
@@ -149,7 +176,7 @@
           continuation=data.conversation;renderAnswer(data,question);return;
         }
         if(data?.mode==='provider'&&data.id){renderCard(data.id);return;}
-        if(gemini)bubble(say('Gemini сейчас недоступен. Можно повторить вопрос чуть позже.','Gemini қазір қолжетімсіз. Сұрағыңызды сәл кейін қайталап көріңіз.'));
+        if(gemini){offerRetry(question,data?.reason);return;}
       }
       const routes=navigation.suggested(question,lastRoutes);
       if(routes.length){
