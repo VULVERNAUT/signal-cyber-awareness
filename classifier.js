@@ -8,12 +8,14 @@
   function decide(input,topics) {
     if(typeof input!=='string')return {state:'length'};
     const q = input.normalize('NFKC').trim().toLowerCase().replaceAll('ё','е');
-    if (!q || q.length > 280) return {state:'length'};
+    if (!q || q.length > 1200) return {state:'length'};
     const credentialLike=/(?:\b(?:sk-(?:proj-)?|gh[pousr]_|github_pat_|aq\.|aiza)[a-z0-9_-]{12,}|\bbearer\s+[a-z0-9._~+\/-]{10,}|\beyj[a-z0-9_-]{6,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}|(?:cvv|cvc)\s*[:=\s]\s*\d{3,4}\b)/i;
-    if (sensitive.test(q)||credentialLike.test(q)) return {state:'private'};
+    const privacyText=q.replace(/\b(?:iso(?:\/iec)?|iec|nist\s+sp|rfc|cve)[ -]+\d{3,5}(?:[-:]\d{2,7})?\b/giu,'standard');
+    if (sensitive.test(privacyText)||credentialLike.test(q)) return {state:'private'};
     if (harmfulKk.test(q)) return {state:'denied'};
     if (recoveryKk.test(q)) return {state:'match',ids:['incident']};
-    if (prohibited.test(q) && !recovery.test(q)) return {state:'denied'};
+    const educational=/^(?:что такое|что значит|как (?:распознать|обнаружить|предотвратить|защититься от)|какие признаки)\s/iu.test(q) && !/(?:как (?:сделать|написать|взломать|обойти)|дай (?:код|пример эксплойта)|пошагов)/iu.test(q);
+    if (prohibited.test(q) && !recovery.test(q) && !educational) return {state:'denied'};
     if (recovery.test(q) && !/обойти|украсть|эксплойт|bypass|\bsteal(?:s|ing)?\b/iu.test(q)) return {state:'match',ids:['incident']};
     const hasKey = key => key.toLowerCase() === 'rat' ? /(?:^|[^a-z])rat(?:$|[^a-z])/i.test(q) : q.includes(key.toLowerCase().replaceAll('ё','е'));
     const ranked = topics.map(t => [t.id, t.keys.reduce((score, key) => score + (hasKey(key) ? key.length : 0),0)]).filter(([,score])=>score).sort((a,b)=>b[1]-a[1]);
