@@ -5,6 +5,8 @@
   function sync(){
     for(const option of options){
       const url=new URL(option.href,location.href);
+      const year=document.querySelector('#data-year');
+      if(year&&year.value)url.searchParams.set('year',year.value);
       url.hash=location.hash;
       option.href=url.href;
     }

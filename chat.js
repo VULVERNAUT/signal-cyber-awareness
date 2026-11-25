@@ -62,24 +62,28 @@
     if(plan)refs.append(link(say('Что делать сейчас','Қазір не істеу керек?'),'response.html#'+plan.id));
     container.append(list,refs);
   }
-  function destinations(container,ids){
+  function destinations(container,ids,question){
     const routes=ids.filter(id=>Object.hasOwn(navigation.entries,id)).slice(0,2);
     if(routes.length){
       const refs=el('p',null,'sources');
       for(const id of routes){
-        const item=navigation.entries[id],a=link(item.label,item.href);
+        const item=navigation.entries[id];
+        let href=item.href;
+        const years=question?.match(/\b20(?:20|21|22|23|24|25)\b/g)||[];
+        if(years.length===1&&['table','charts','data'].includes(id))href=href.replace('data.html','data.html?year='+years[0]);
+        const a=link(item.label,href);
         a.addEventListener('click',()=>dialog.close());refs.append(a);
       }
       container.append(refs);
     }
     lastRoutes=routes;
   }
-  function renderAnswer(data){
+  function renderAnswer(data,question){
     const container=bubble(null);
     container.append(el('strong',say('Ответ Gemini','Gemini жауабы')));
     const body=el('p',data.answer.replace(/\*\*([^*]+)\*\*/g,'$1'),'generated-answer');
     container.append(body);
-    destinations(container,data.routes||[]);
+    destinations(container,data.routes||[],question);
     if(data.references?.length){
       const refs=el('p',null,'sources');
       for(const source of data.references){
@@ -133,12 +137,12 @@
         attempted=true;
         let data=null;
         try{
-          const r=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(gemini?34000:6500)});
+          const r=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(gemini?40500:6500)});
           if(r.ok)data=await r.json();
         }catch{}
         pending.remove();pending=null;
         if(data?.mode==='gemini'&&typeof data.answer==='string'){
-          continuation=data.conversation;renderAnswer(data);return;
+          continuation=data.conversation;renderAnswer(data,question);return;
         }
         if(data?.mode==='provider'&&data.id){renderCard(data.id);return;}
         if(gemini)bubble(say('Gemini сейчас недоступен. Можно повторить вопрос чуть позже.','Gemini қазір қолжетімсіз. Сұрағыңызды сәл кейін қайталап көріңіз.'));
@@ -147,7 +151,7 @@
       if(routes.length){
         const item=navigation.entries[routes[0]];
         const result=bubble(item.detail||say('Откройте раздел «','«')+item.label+say('».','» бөлімін ашыңыз.'));
-        destinations(result,routes);
+        destinations(result,routes,question);
       }else{
         lastRoutes=[];
         if(id)renderCard(id);else if(!attempted||!gemini)bubble(response.unknown);

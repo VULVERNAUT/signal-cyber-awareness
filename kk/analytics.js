@@ -98,5 +98,7 @@
     const a=link('CSV',url);a.download='signal-ic3-'+y+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   year.addEventListener('change',selectYear);group.addEventListener('change',table);query.addEventListener('input',table);
+  const linkedYear=new URLSearchParams(location.search).get('year');
+  if(years.map(String).includes(linkedYear))year.value=linkedYear;
   [metric,category].forEach(x=>x.addEventListener('change',compare));selectYear();compare();
 })();
