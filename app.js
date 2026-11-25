@@ -21,7 +21,9 @@ if (gallery) {
   const videos = episodes.map(episode => episode.querySelector('video'));
   for (const video of videos) {
     if (typeof VTTCue === 'function') {
-      const track = video.addTextTrack('captions','Русский','ru');
+      const language = document.documentElement.lang.split('-')[0];
+      const captionLabel = video.dataset.captionLabel || { kk: 'Қазақша', ru: 'Русский' }[language] || language;
+      const track = video.addTextTrack('captions',captionLabel,language);
       for (const [start,end,text] of JSON.parse(video.dataset.captions)) {
         track.addCue(new VTTCue(start,end,text));
       }
@@ -155,6 +157,7 @@ if(form) {
   };
   let busy=false;
   let endpointActive=false;
+  let geminiActive=false;
   let challengeRequired=false;
   let challengeToken='';
   let widgetId;
@@ -203,15 +206,16 @@ if(form) {
     bubble.append(list,refs);
   }
   async function choose(question,ids) {
-    if(!endpointActive||ids.length<2||(challengeRequired&&!challengeToken)) return ids[0];
+    if(!endpointActive||(!geminiActive&&ids.length<2)||(challengeRequired&&!challengeToken)) return ids[0];
     const payload=challengeRequired?{question,verification:challengeToken}:{question};
     if(challengeRequired) challengeToken='';
     try {
-      const ret=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(challengeRequired?5500:3600)});
+      const ret=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(geminiActive?17000:challengeRequired?5500:3600)});
       if(!ret.ok) return ids[0];
       const data=await ret.json();
       if(data.mode!=='provider') return ids[0];
-      return ids.includes(data.id)?data.id:ids[0];
+      if(data.id==='unrelated') return null;
+      return topics.some(topic=>topic.id===data.id)?data.id:ids[0];
     } catch { return ids[0]; }
     finally {
       if(challengeRequired&&widgetId!==undefined) {
@@ -229,7 +233,10 @@ if(form) {
     if(messages.childElementCount>=31) messages.replaceChildren(...[...messages.children].slice(-29));
     const result=decide(input);
     message(result.state==='private'?'Вопрос скрыт из-за возможных личных данных.':input.trim(),'user');
-    if(result.state==='match') showTopic(await choose(input.trim(),result.ids));
+    if(result.state==='match'||(geminiActive&&result.state==='unknown')) {
+      const id=await choose(input.trim(),result.ids||[]);
+      if(id)showTopic(id);else message(replies.unknown,'bot');
+    }
     else message(replies[result.state],'bot');
     messages.scrollTop=messages.scrollHeight;
     controls.forEach(button=>{button.disabled=false;});
@@ -246,7 +253,13 @@ if(form) {
     .then(ret=>ret.ok&&ret.headers.get('content-type')?.includes('application/json')?ret.json():{})
     .then(status=>{
       endpointActive=status.provider===true;
+      geminiActive=endpointActive&&status.gemini===true;
+      if(geminiActive){
+        const notice=el('p','При отправке текст вопроса передаётся Google для выбора темы. Скройте личные данные.','provider-notice');
+        form.before(notice);
+      }
       if(endpointActive&&status.siteKey) enableVerification(status.siteKey);
+      else if(geminiActive) $('#mode').textContent='Gemini подбирает тему · ответы из справочника';
       else if(endpointActive) $('#mode').textContent='Подбор с ИИ · ответы из справочника';
     }).catch(()=>{});
   },{once:true});

@@ -16,21 +16,30 @@
     return shuffled([...first,...rest.slice(0,5-first.length)]);
   }
   let run=[],position=0,score=0,misses=[],route='quick',answered=false;
+  let picks=[];
+  const transfer=window.signalPracticeState?.create(scenarios,scenarioMeta,Object.keys(buckets));
+  function remember(){transfer?.write(route,run,position,picks);}
   function button(label,css,fn){
     const b=el('button',label,css);b.type='button';b.addEventListener('click',fn);return b;
   }
-  function start(id,items){
-    route=id;run=items;position=score=0;misses=[];answered=false;
+  function start(id,items,restored){
+    route=id;run=items;position=restored?.position??0;score=0;misses=[];answered=false;
+    picks=restored?.answers??[];
+    for(let i=0;i<position;i++){
+      if(picks[i]===run[i][3]) score++; else misses.push(run[i]);
+    }
     picker.hidden=true;panel.hidden=false;render();
   }
   function exit(){
     panel.hidden=true;picker.hidden=false;
+    transfer?.clear();
     const group=topics.find(topic=>'topic-'+topic.id===route)?.group||route;
     picker.querySelector('[data-route="'+group+'"]')?.focus();
     if(location.hash.startsWith('#practice-')) history.replaceState(null,'',location.href.split('#')[0]);
   }
   function render(){
     answered=false;
+    remember();
     panel.replaceChildren();
     const bar=el('div',null,'round-head');
     const routeTitle=names[route]||topics.find(topic=>'topic-'+topic.id===route)?.title;
@@ -61,6 +70,8 @@
       const choice=button(s,'choice',()=>{
         if(answered) return;
         answered=true;
+        if(picks.length===position) picks.push(i);
+        remember();
         if(i===correct)score++;else misses.push(item);
         progress.value=position+1;
         Array.from(answers.children).forEach((a,j)=>{a.disabled=true;a.classList.toggle('correct',j===correct);a.classList.toggle('incorrect',j===i&&j!==correct);});
@@ -74,7 +85,8 @@
       });
       choice.prepend(el('span',String.fromCharCode(1040+i)));answers.append(choice);
     });
-    h.focus();
+    if(picks.length>position) answers.children[picks[position]].click();
+    else h.focus();
   }
   function openRoute(id){
     if(id.startsWith('topic-')){
@@ -86,10 +98,12 @@
     start(id,id==='quick'?quickRound():shuffled(buckets[id]));
   }
   for(const b of picker.querySelectorAll('[data-route]'))b.addEventListener('click',()=>openRoute(b.dataset.route));
-  if(location.hash.startsWith('#practice-'))openRoute(location.hash.slice(10));
+  const restored=transfer?.read();
+  if(restored) start(restored.route,restored.run,restored);
+  else if(location.hash.startsWith('#practice-')) openRoute(location.hash.slice(10));
   window.addEventListener('hashchange',()=>{
     if(location.hash.startsWith('#practice-')) openRoute(location.hash.slice(10));
-    else if(!location.hash){panel.hidden=true;picker.hidden=false;}
+    else if(!location.hash){panel.hidden=true;picker.hidden=false;transfer?.clear();}
   });
   const fragments=Array.from(document.querySelectorAll('[data-clue]'));
   const check=document.getElementById('grade-clues');
