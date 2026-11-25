@@ -6,6 +6,18 @@
   const kk=lang==='kk';
   const say=(ru,kz)=>kk?kz:ru;
   const field=$('#question'), messages=$('#messages'), mode=$('#mode');
+  const resizeButton=dialog.querySelector('.chat-resize');
+  if(resizeButton){
+    const expandLabel=resizeButton.getAttribute('aria-label');
+    resizeButton.addEventListener('click',()=>{
+      const atBottom=messages.scrollHeight-messages.clientHeight-messages.scrollTop<=2;
+      const expanded=dialog.classList.toggle('is-expanded');
+      const label=expanded?say('Вернуть обычный размер','Бастапқы өлшемге қайтару'):expandLabel;
+      resizeButton.setAttribute('aria-label',label);
+      resizeButton.title=label;
+      if(atBottom)messages.scrollTop=messages.scrollHeight;
+    });
+  }
   let active=false, gemini=false, busy=false, challenge='', widget=null, verification=false, continuation='';
   const response={
     private:say('Уберите из вопроса личные данные, пароли и коды подтверждения.','Сұрағыңыздан дербес деректерді, құпиясөздер мен растау кодтарын алып тастаңыз.'),
