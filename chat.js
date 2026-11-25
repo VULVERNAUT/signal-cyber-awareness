@@ -80,14 +80,18 @@
   }
   function renderAnswer(data,question){
     const container=bubble(null);
-    container.append(el('strong',say('Ответ Gemini','Gemini жауабы')));
+    container.append(el('strong',data.mode==='sources'?say('Поиск по источникам','Дереккөздерден іздеу'):say('Ответ Gemini','Gemini жауабы')));
     const body=el('p',data.answer.replace(/\*\*([^*]+)\*\*/g,'$1'),'generated-answer');
     container.append(body);
     destinations(container,data.routes||[],question);
     if(data.references?.length){
       const refs=el('p',null,'sources');
       for(const source of data.references){
-        if(typeof source.url==='string'&&source.url.startsWith('https://learn.microsoft.com/'))refs.append(link(source.title,source.url));
+        const publisher=window.signalPublisher(source.url);
+        if(!publisher || typeof source.title!=='string')continue;
+        const item=link(publisher+' · '+source.title,source.url);
+        item.target='_blank';item.rel='noopener noreferrer';
+        refs.append(item);
       }
       container.append(refs);
     }
@@ -103,11 +107,11 @@
       if(status.siteKey&&active)verify(status.siteKey);
       if(gemini){
         const note=$('.chat-note');
-        note.prepend(document.createTextNode(say('Диалог передаётся Google. По просьбе «найди в интернете» тема запроса также передаётся в Microsoft Learn. ','Диалог Google қызметіне жіберіледі. «Интернеттен ізде» десеңіз, сұрау тақырыбы Microsoft Learn қызметіне де жіберіледі. ')));
+        note.prepend(document.createTextNode(say('Диалог передаётся Google. При поиске тема запроса передаётся выбранным официальным источникам. В ответе появятся ссылки на найденные публикации. ','Диалог Google қызметіне жіберіледі. Іздеу кезінде сұрау тақырыбы таңдалған ресми дереккөздерге жіберіледі. Жауапта табылған жарияланымдарға сілтемелер беріледі. ')));
         const about=$('.chat-side p');
         if(about)about.textContent=say('Gemini формулирует ответ на ваш вопрос и учитывает уточнения в этом диалоге. Подходящие материалы справочника можно открыть отдельно.','Gemini сұрағыңызға жауап құрастырады және осы әңгімедегі нақтылауларыңызды ескереді. Байланысты материалдарды анықтамалықтан бөлек аша аласыз.');
         const quick=$$('.quick button');
-        const examples=kk?['Хэштеу мен шифрлаудың айырмашылығы неде?','Үй желісінде қонақтарға бөлек Wi-Fi не үшін керек?','Passkey қалай жұмыс істейді?']:['Чем хеширование отличается от шифрования?','Зачем дома отдельный Wi-Fi для гостей?','Как работает passkey?'];
+        const examples=kk?['Хэштеу мен шифрлаудың айырмашылығы неде?','Үй желісінде қонақтарға бөлек Wi-Fi не үшін керек?','Қазақстанда фишинг туралы ресми дереккөздерді тап']:['Чем хеширование отличается от шифрования?','Зачем дома отдельный Wi-Fi для гостей?','Найди официальные источники о фишинге в Казахстане'];
         quick.forEach((button,index)=>{if(examples[index])button.textContent=examples[index];});
       }
       label();if(messages.childElementCount===1)messages.firstChild.textContent=greeting();
@@ -141,7 +145,7 @@
           if(r.ok)data=await r.json();
         }catch{}
         pending.remove();pending=null;
-        if(data?.mode==='gemini'&&typeof data.answer==='string'){
+        if(['gemini','sources'].includes(data?.mode)&&typeof data.answer==='string'){
           continuation=data.conversation;renderAnswer(data,question);return;
         }
         if(data?.mode==='provider'&&data.id){renderCard(data.id);return;}
