@@ -20,6 +20,7 @@
   }
   let active=false, gemini=false, busy=false, challenge='', widget=null, verification=false, continuation='';
   let lastRoutes=[];
+  let guideCase=null;
   let retryButton=null;
   const navigation=window.signalNav;
   const response={
@@ -46,7 +47,7 @@
     }
     return response.unknown;
   }
-  function reset(){continuation='';lastRoutes=[];retryButton=null;messages.replaceChildren();bubble(greeting());}
+  function reset(){continuation='';lastRoutes=[];guideCase=null;retryButton=null;messages.replaceChildren();bubble(greeting());}
   function label(){
     mode.textContent=verification&&!challenge?say('Для ИИ нужна проверка','ЖИ үшін тексеруден өтіңіз'):gemini?say('Gemini · ИИ-ассистент','Gemini · ЖИ көмекші'):active?say('Подбор темы с ИИ','Тақырыпты ЖИ таңдайды'):say('Режим справочника','Анықтамалық режимі');
   }
@@ -74,6 +75,19 @@
     const plan=plans.find(p=>p.id===t.plan||p.topic===id);
     if(plan)refs.append(link(say('Что делать сейчас','Қазір не істеу керек?'),'response.html#'+plan.id));
     container.append(list,refs);
+  }
+  function renderCase(advice){
+    const container=bubble(null);
+    for(const paragraph of advice.paragraphs)container.append(el('p',paragraph));
+    const refs=el('p',null,'sources');
+    if(advice.plan){
+      const plan=plans.find(item=>item.id===advice.plan);
+      if(plan)refs.append(link(plan.label,'response.html#'+plan.id));
+    }
+    const topic=topics.find(item=>item.id===advice.topic);
+    if(topic)refs.append(link(topic.title,'guide.html#'+topic.id));
+    if(sources[advice.source])refs.append(link(...sources[advice.source]));
+    container.append(refs);
   }
   function destinations(container,ids,question){
     const routes=ids.filter(id=>Object.hasOwn(navigation.entries,id)).slice(0,2);
@@ -192,12 +206,16 @@
       }
       const routes=navigation.suggested(question,lastRoutes);
       if(routes.length){
+        guideCase=null;
         const item=navigation.entries[routes[0]];
         const result=bubble(item.detail||say('Откройте раздел «','«')+item.label+say('».','» бөлімін ашыңыз.'));
         destinations(result,routes,question);
       }else{
         lastRoutes=[];
-        if(id)renderCard(id);
+        const advice=window.signalCaseAdvice?.(question,lang,guideCase);
+        guideCase=advice?.state||null;
+        if(advice)renderCase(advice);
+        else if(id)renderCard(id);
         else destinations(bubble(guidePrompt(question)),['guide','lab'],question);
       }
     }finally{
