@@ -124,12 +124,17 @@
     }
   }
   const isStatic=location.protocol==='file:'||/\.(github\.io|chatgpt\.site)$/.test(location.hostname);
+  const onPages=location.origin==='https://vulvernaut.github.io'&&location.pathname.startsWith('/signal-cyber-awareness/');
+  const apiBase=onPages?document.querySelector('meta[name="signal-assistant-origin"]')?.content:'';
   async function detect(){
-    if(isStatic)return;
+    if(isStatic&&!apiBase)return;
     try{
-      const ret=await fetch('/api/status',{signal:AbortSignal.timeout(2200)});
-      if(!ret.ok||!ret.headers.get('content-type')?.includes('application/json'))return;
-      const status=await ret.json();
+      let status={provider:true,gemini:true};
+      if(!onPages){
+        const ret=await fetch('/api/status',{signal:AbortSignal.timeout(2200)});
+        if(!ret.ok||!ret.headers.get('content-type')?.includes('application/json'))return;
+        status=await ret.json();
+      }
       active=status.provider===true;gemini=active&&status.gemini===true;
       if(status.siteKey&&active)verify(status.siteKey);
       if(gemini){
@@ -154,7 +159,7 @@
     }
     let notice=say('Не удалось получить ответ Gemini.','Gemini-ден жауап алу мүмкін болмады.');
     if(reason==='quota')notice=say('Gemini сообщил о лимите запросов.','Gemini сұраулар шегіне жеткенін хабарлады.');
-    if(reason==='limit')notice=say('Достигнут лимит запросов демонстрации.','Демонстрациядағы сұраулар шегіне жеттіңіз.');
+    if(reason==='limit')notice=say('Достигнут лимит запросов. Попробуйте позже. Справочник и практикум по-прежнему доступны.','Сұраулар саны шегіне жетті. Кейінірек қайталап көріңіз. Анықтамалық пен практикумды қазір де пайдалана аласыз.');
     if(reason==='verification')notice=say('Для ответа Gemini пройдите проверку в окне чата.','Gemini жауап беруі үшін чаттағы тексеруден өтіңіз.');
     const container=bubble(continuation?notice+say(' Можно повторить эту реплику в том же диалоге.',' Осы хабарламаны сол әңгімеде қайта жіберуге болады.'):notice);
     const action=el('button',say('Повторить отправку','Қайта жіберу'),'chip');
@@ -194,10 +199,11 @@
         attempted=true;
         let data=null;
         try{
-          const r=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(gemini?40500:6500)});
-          if(r.ok)data=await r.json();
+          const r=await fetch((apiBase||'')+'/api/assistant',{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(gemini?40500:6500)});
+          if(r.headers.get('content-type')?.includes('application/json'))data=await r.json();
         }catch{}
         pending.remove();pending=null;
+        if(data&&['private','denied','length'].includes(data.state)){bubble(response[data.state]);return;}
         if(['gemini','sources'].includes(data?.mode)&&typeof data.answer==='string'){
           continuation=data.conversation;renderAnswer(data,question);return;
         }
